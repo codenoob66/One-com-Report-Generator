@@ -3,7 +3,9 @@ import os
 import time
 import re
 import subprocess
+import ctypes
 import urllib.request
+from ctypes import wintypes
 from playwright.sync_api import sync_playwright
 
 def is_chrome_running():
@@ -70,6 +72,11 @@ def find_div_by_text(page, text):
     if div_locator.count() > 0:
         return div_locator
     return None
+
+def get_desktop_path():
+    buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+    ctypes.windll.shell32.SHGetFolderPathW(0, 0, 0, 0, buf)
+    return buf.value
 
 def main():
     if not is_chrome_running():
@@ -188,21 +195,34 @@ def main():
                 else:
                     print("Excel checkbox is already checked. Skipping click.")
                 
-                # Now safely click the modal's final 'Export' button
-                print("Clicking the modal's 'Export' button to start download...")
+                # Click the modal's 'Export' button and capture the download
+                print("Clicking the modal's 'Export' button...")
                 modal_export_btn = target_page.locator("button:has-text('Export'):visible")
+                btn_to_click = None
                 if modal_export_btn.count() > 1:
                     print(f"Found {modal_export_btn.count()} export buttons. Clicking the last one (inside modal)...")
-                    modal_export_btn.last.click(force=True)
+                    btn_to_click = modal_export_btn.last
                 elif modal_export_btn.count() == 1:
                     print("Found 1 export button. Clicking it...")
-                    modal_export_btn.first.click(force=True)
+                    btn_to_click = modal_export_btn.first
                 else:
                     print("Error: Could not locate the modal's 'Export' button.")
-                
-                # Wait 25 seconds to ensure Zendesk starts sending the download stream before script terminates
-                print("Waiting 25 seconds for the download to start and stabilize...")
-                target_page.wait_for_timeout(25000)
+                    return
+
+                desktop = get_desktop_path()
+                os.makedirs(desktop, exist_ok=True)
+                desktop_path = os.path.join(desktop, "email_report.xlsx")
+                print("Setting up download capture...")
+                try:
+                    with target_page.expect_download(timeout=120000) as download_info:
+                        btn_to_click.click(force=True)
+                    download = download_info.value
+                    download.save_as(desktop_path)
+                    print(f"Download saved to {desktop_path}")
+                except Exception as e:
+                    print(f"Download failed or timed out: {e}")
+                    print("Waiting 60 seconds as fallback...")
+                    target_page.wait_for_timeout(60000)
             else:
                 print("Error: Could not locate 'Excel' checkbox option.")
 

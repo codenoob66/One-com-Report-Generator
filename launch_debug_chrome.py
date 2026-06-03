@@ -38,6 +38,7 @@ def launch_chrome():
     cmd = [
         chrome_path,
         "--remote-debugging-port=9222",
+        "--headless",
         f"--user-data-dir={user_data_dir}",
         url
     ]

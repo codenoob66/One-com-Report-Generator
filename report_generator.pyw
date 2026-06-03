@@ -77,6 +77,9 @@ class ReportGeneratorApp:
                   command=self.team_heralds, bg="#2196F3", fg="white").pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="Export to Excel",
                   command=self.export_excel, bg="#FF9800", fg="white").pack(side=tk.LEFT, padx=5)
+        self.btn_automation = tk.Button(btn_frame, text="Run Automation",
+                                        command=self.start_automation, bg="#9C27B0", fg="white")
+        self.btn_automation.pack(side=tk.LEFT, padx=5)
 
         # --- Tables frame ---
         tables_frame = tk.Frame(main_paned_window)
@@ -342,6 +345,79 @@ class ReportGeneratorApp:
 
         wb.save(filepath)
         messagebox.showinfo("Success", f"Report exported to:\n{filepath}")
+
+    def start_automation(self):
+        self.btn_automation.config(state=tk.DISABLED, text="Running...")
+        
+        import threading
+        thread = threading.Thread(target=self.run_automation_flow)
+        thread.daemon = True
+        thread.start()
+
+    def run_automation_flow(self):
+        import subprocess
+        import sys
+        
+        scripts = [
+            "launch_debug_chrome.py",
+            "uncheck_image.py",
+            "check_excel.py",
+            "launch_debug_chrome_email.py",
+            "uncheck_image_email.py",
+            "check_excel_email.py"
+        ]
+        
+        success = True
+        for script in scripts:
+            script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), script)
+            if not os.path.exists(script_path):
+                script_path = script
+            
+            try:
+                print(f"Running script: {script}")
+                subprocess.run([sys.executable, script_path], check=True)
+            except (subprocess.CalledProcessError, Exception) as e:
+                print(f"Error running {script}: {e}")
+                success = False
+                break
+                
+        self.root.after(0, lambda: self.automation_finished(success))
+
+    def get_desktop_path(self):
+        if os.name == 'nt':
+            try:
+                import ctypes
+                from ctypes import wintypes
+                buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+                ctypes.windll.shell32.SHGetFolderPathW(0, 0, 0, 0, buf)
+                if buf.value:
+                    return buf.value
+            except Exception:
+                pass
+        return os.path.join(os.path.expanduser("~"), "Desktop")
+
+    def automation_finished(self, success):
+        self.btn_automation.config(state=tk.NORMAL, text="Run Automation")
+        if success:
+            desktop = self.get_desktop_path()
+            messaging_report = os.path.join(desktop, "messaging_report.xlsx")
+            email_report = os.path.join(desktop, "email_report.xlsx")
+            
+            updated = False
+            if os.path.exists(messaging_report):
+                self.messaging_path.set(messaging_report)
+                updated = True
+            if os.path.exists(email_report):
+                self.email_path.set(email_report)
+                updated = True
+                
+            if updated:
+                messagebox.showinfo("Automation Complete", "Reports downloaded and paths updated successfully! Generating report...")
+                self.generate_report()
+            else:
+                messagebox.showwarning("Automation Warning", "Automation finished, but downloaded report files were not found on the Desktop.")
+        else:
+            messagebox.showerror("Automation Error", "An error occurred during the automation flow. Please check the terminal output.")
 
 
 if __name__ == "__main__":

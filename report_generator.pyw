@@ -172,7 +172,7 @@ class ReportGeneratorApp:
         return data
 
     def team_heralds(self):
-        self.filter_var.set("rafael, nevea, meg, marktwin, Niñoel Dagwayan, Rey Vergel, marcelo, lovely, Candy, Nathalie Dandan")
+        self.filter_var.set("rafael, nevea, denn Cyrus, marktwin, Niñoel Dagwayan, Rey Vergel, marcelo, lovely, Eureka, Ma. Krizzia, Nathalie Dandan, Ralph Michael")
         self.generate_report()
 
     def generate_report(self):
